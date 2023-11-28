@@ -3,7 +3,7 @@
  */
 const express = require("express");
 const app = express();
-const router = require("./routes/Registration.routes");
+const router = require("./routes/User.routes");
 
 require("dotenv").config();
 require("./config/db.config");

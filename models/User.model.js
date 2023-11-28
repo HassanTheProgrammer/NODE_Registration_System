@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const RegistrationSchema = new mongoose.Schema(
+const userRegistrationSchema = new mongoose.Schema(
   {
     fullName: {
       type: String,
@@ -23,10 +23,17 @@ const RegistrationSchema = new mongoose.Schema(
       type: String,
       requried: true,
     },
+    forgotPasswordOTP: {
+      type: String,
+    },
+    // forgotPasswordOTPExpire: Number,
   },
   { timestamps: true }
 );
 
-const RegistrationModel = mongoose.model("Registration", RegistrationSchema);
+const userRegistrationModel = mongoose.model(
+  "Registration",
+  userRegistrationSchema
+);
 
-module.exports = RegistrationModel;
+module.exports = userRegistrationModel;

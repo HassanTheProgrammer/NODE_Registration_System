@@ -10,16 +10,13 @@ const storage = multer.diskStorage({
    * Check, Create and Return Destination Path
    */
   destination: (req, file, cb) => {
-    // if(!fs.existsSync("public")){
-    //     fs.mkdirSync("public");
-    // }
-    fs?.existsSync("public") ?? fs?.mkdirSync("public");
+    if (!fs.existsSync("public")) {
+      fs.mkdirSync("public");
+    }
 
-    // if (!fs.existsSync("public/profileImages")) {
-    //   fs.mkdirSync("public/profileImages");
-    // }
-    fs?.existsSync("public/profileImages") ??
-      fs?.mkdirSync("public/profileImages");
+    if (!fs.existsSync("public/profileImages")) {
+      fs.mkdirSync("public/profileImages");
+    }
 
     cb(null, "public/profileImages");
   },
@@ -28,7 +25,7 @@ const storage = multer.diskStorage({
    * File Name
    */
   filename: (req, file, cb) => {
-    cb(null, file.originalname + Date.now());
+    cb(null, `${Date.now()}_${file.originalname}`);
   },
 });
 
@@ -45,8 +42,10 @@ const fileFilter = (req, file, cb) => {
     : cb?.(null, true);
 };
 
-exports.upload = multer({
+const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   //   limits : { fileSize: 100000 }
 });
+
+module.exports = upload;

@@ -11,7 +11,7 @@ const router = express.Router();
  */
 router.post(
   "/handleUserRegistration",
-  upload.single("profileImage"),
+  upload.single("image"),
   userController.handleUserRegistration
 );
 
@@ -34,3 +34,13 @@ router.get(
  */
 router.post("/handleForgotPassword", userController.handleForgotPassword);
 module.exports = router;
+
+/**
+ * handleOTPVarification
+ */
+router.post("/handleOTPVarification", userController.handleOTPVarification);
+
+/**
+ * handleResetPassword
+ */
+router.post("/handleResetPassword", userController.handleResetPassword);

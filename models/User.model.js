@@ -14,6 +14,7 @@ const userRegistrationSchema = new mongoose.Schema(
     image: {
       type: String,
       required: true,
+      unique: true,
     },
     email: {
       type: String,
@@ -25,8 +26,16 @@ const userRegistrationSchema = new mongoose.Schema(
     },
     forgotPasswordOTP: {
       type: String,
+      default: "",
     },
-    // forgotPasswordOTPExpire: Number,
+    forgotPasswordOTPExpire: {
+      type: Number,
+      default: 0,
+    },
+    setNewPassword: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

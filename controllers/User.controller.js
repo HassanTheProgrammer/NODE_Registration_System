@@ -19,6 +19,13 @@ exports.handleUserRegistration = async (req, res) => {
           .status(400)
           .json({ success: false, message: "Invalid Email Address!" });
       }
+      const isExistEamil = await User.findOne({ email });
+      if (isExistEamil) {
+        return res.status(400).json({
+          success: false,
+          message: "user with this email already exists",
+        });
+      }
       if (password !== confirmPassword) {
         return res.status(400).json({
           success: false,
@@ -36,28 +43,26 @@ exports.handleUserRegistration = async (req, res) => {
             hash,
           });
         } else {
-          await User.create({
-            fullName,
-            cnic,
-            email,
-            password: hash,
-            image: req.file.path,
-          })
-            .then((user) => {
-              const jwtToken = JWTTokenGenerator(user._id);
-              res.status(200).json({
-                success: true,
-                message: "User Registered Successfully",
-                jwtToken,
-              });
-            })
-            .catch((error) => {
-              res.status(400).json({
-                success: false,
-                message: "Error during user registeration",
-                error: error.message,
-              });
+          try {
+            const user = await User.create({
+              fullName,
+              cnic,
+              email,
+              password: hash,
+              image: req.file.path,
             });
+            const jwtToken = handleGenerateJWTToken(user._id);
+            res.status(200).json({
+              success: true,
+              message: "User Registered Successfully",
+              jwtToken,
+            });
+          } catch (error) {
+            res.status(400).json({
+              success: false,
+              error: error.message,
+            });
+          }
         }
       });
     }
@@ -91,7 +96,7 @@ exports.handleUserLogin = async (req, res) => {
           .json({ success: false, message: "Invalid Email or Password" });
       }
 
-      const jwtToken = JWTTokenGenerator(user._id);
+      const jwtToken = handleGenerateJWTToken(user._id);
       res.status(200).json({
         success: true,
         message: "Login Successfully",
@@ -134,7 +139,6 @@ exports.handleGetUserData = async (req, res) => {
 exports.handleForgotPassword = async (req, res) => {
   try {
     let { email } = req.body;
-    console.log(email);
     email = email?.toLowerCase();
     if (!email) {
       return res.status(400).json({
@@ -160,20 +164,19 @@ exports.handleForgotPassword = async (req, res) => {
       Math.floor(Math.random() * 899999) + 100000
     ).toString();
     console.log("Forgot Password: ", forgotPasswordOTP);
-    const salt = bcrypt.genSalt(10);
-    const hashedOTP = bcrypt.hash(forgotPasswordOTP, salt);
-    console.log(`Hashed OTP: ${hashedOTP}`);
+    const salt = await bcrypt.genSalt(10);
+    const hashedOTP = await bcrypt.hash(forgotPasswordOTP, salt);
     await User.findOneAndUpdate(
       { email },
       {
         forgotPasswordOTP: hashedOTP,
-        // forgotPasswordOTPExpire: Date.now() + 5 * 60 * 1000,
+        forgotPasswordOTPExpire: Date.now() + 5 * 60 * 1000,
       }
     )
       .then((result) => {
         res.status(200).json({
           success: true,
-          // message: `Your OTP is ${forgotPasswordOTP}`,
+          message: `Your OTP is ${forgotPasswordOTP}`,
           result,
         });
       })
@@ -192,6 +195,125 @@ exports.handleForgotPassword = async (req, res) => {
     });
   }
 };
-const JWTTokenGenerator = (id) => {
+
+/**
+ * handleOTPVarification
+ */
+exports.handleOTPVarification = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({
+      email,
+      forgotPasswordOTPExpire: { $gt: Date.now() },
+    });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has been expired",
+      });
+    }
+    const isValidOTP = await bcrypt.compare(otp, user.forgotPasswordOTP);
+    if (!isValidOTP) {
+      return res.status(400).json({
+        success: false,
+        message: "Wrong OTP",
+      });
+    }
+
+    try {
+      await User.findOneAndUpdate(
+        { email },
+        {
+          setNewPassword: true,
+          forgotPasswordOTP: "",
+        }
+      );
+      res.status(200).json({
+        success: true,
+        message: "OTP Varified Successfully",
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * handleResetPassword
+ */
+exports.handleResetPassword = async (req, res) => {
+  try {
+    const { email, newPassword, confirmNewPassword } = req.body;
+    if (!newPassword || !confirmNewPassword) {
+      res.status(400).json({
+        success: false,
+        message: "required empty fields",
+      });
+    }
+    email?.toLowerCase();
+
+    const isUser = await User.findOne({ email });
+
+    if (!isUser.setNewPassword) {
+      res.status(400).json({
+        success: false,
+        message: "you are not allowed to do that",
+      });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      res.status(400).json({
+        success: false,
+        message: "password and confirm password don't match",
+      });
+    }
+
+    try {
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      await User.findOneAndUpdate(
+        { email },
+        {
+          password: hashedPassword,
+          setNewPassword: false,
+        }
+      );
+      return res.status(200).json({
+        success: true,
+        message: "new password successfully updated",
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: "error during update password in DB",
+        errorMessage: error.message,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: isUser,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Handle Reset Password - catch Error",
+      errorMessage: error.message,
+    });
+  }
+};
+/**
+ * handleGenerateJWTToken
+ */
+const handleGenerateJWTToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SIGNATURE);
 };

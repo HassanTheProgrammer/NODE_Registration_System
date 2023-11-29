@@ -12,7 +12,7 @@ require("./config/db.config");
  * Middleware
  */
 app.use(express.json());
-app.use("/registrationSystem", router);
+app.use("/api/v1", router);
 
 /**
  * Run Server

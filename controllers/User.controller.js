@@ -2,6 +2,7 @@ const User = require("../models/User.model");
 const { validateEmail } = require("../utils/validateEmail");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const sendEmail = require("../utils/sendEmail");
 
 /**
  * uerRegistration
@@ -10,37 +11,49 @@ exports.handleUserRegistration = async (req, res) => {
   try {
     const { fullName, cnic, email, password, confirmPassword } = req.body;
     if (!fullName || !cnic || !email || !password || !confirmPassword) {
+      console.log("missing required fields!");
       return res
         .status(400)
-        .json({ success: false, message: "Missing Required Fields!" });
+        .json({ success: false, message: "missing required fields!" });
     } else {
       if (!validateEmail(email)) {
+        console.log('invalid email address!"');
         return res
           .status(400)
-          .json({ success: false, message: "Invalid Email Address!" });
+          .json({ success: false, message: "invalid email address!" });
       }
       const isExistEamil = await User.findOne({ email });
       if (isExistEamil) {
+        console.log("user with this email already exists");
         return res.status(400).json({
           success: false,
           message: "user with this email already exists",
         });
       }
-      if (password !== confirmPassword) {
+      if (await User.findOne({ cnic })) {
+        console.log("user with this cnic already exists");
         return res.status(400).json({
           success: false,
-          message: "Password and Confirm Password input fields must be same!",
+          message: "user with this cnic already exists",
+        });
+      }
+      if (password !== confirmPassword) {
+        console.log("password and confirm password input fields must be same!");
+        return res.status(400).json({
+          success: false,
+          message: "password and confirm password input fields must be same!",
         });
       }
 
       const salt = await bcrypt.genSalt(10);
       await bcrypt.hash(password, salt, async (error, hash) => {
         if (error) {
+          console.log(error.message);
           return res.status(400).json({
             success: false,
-            message: "Error during hasing password",
-            error,
-            hash,
+            // message: "Error during hasing password",
+            message: error.message,
+            // hash,
           });
         } else {
           try {
@@ -52,15 +65,17 @@ exports.handleUserRegistration = async (req, res) => {
               image: req.file.path,
             });
             const jwtToken = handleGenerateJWTToken(user._id);
+            console.log("registered successfully");
             res.status(200).json({
               success: true,
-              message: "User Registered Successfully",
+              message: "registered successfully",
               jwtToken,
             });
           } catch (error) {
+            console.log(error.message);
             res.status(400).json({
               success: false,
-              error: error.message,
+              message: error.message,
             });
           }
         }
@@ -163,7 +178,7 @@ exports.handleForgotPassword = async (req, res) => {
     const forgotPasswordOTP = (
       Math.floor(Math.random() * 899999) + 100000
     ).toString();
-    console.log("Forgot Password: ", forgotPasswordOTP);
+    console.log("Forgot Password OTP: ", forgotPasswordOTP);
     const salt = await bcrypt.genSalt(10);
     const hashedOTP = await bcrypt.hash(forgotPasswordOTP, salt);
     await User.findOneAndUpdate(
@@ -174,11 +189,24 @@ exports.handleForgotPassword = async (req, res) => {
       }
     )
       .then((result) => {
-        res.status(200).json({
-          success: true,
-          message: `Your OTP is ${forgotPasswordOTP}`,
-          result,
-        });
+        try {
+          sendEmail({
+            companyName: "Smartfun Studios",
+            email,
+            subject: "Password Reset OTP",
+            message: `Your OTP is ${forgotPasswordOTP}`,
+          });
+        } catch (error) {
+          res.status(400).json({
+            success: false,
+            messag: `email not sent - error is - ${error.message}`,
+          });
+        }
+        // res.status(200).json({
+        //   success: true,
+        //   message: `Your OTP is ${forgotPasswordOTP}`,
+        //   // result,
+        // });
       })
       .catch((error) => {
         res.status(400).json({
@@ -204,9 +232,15 @@ exports.handleOTPVarification = async (req, res) => {
     const { email, otp } = req.body;
     const user = await User.findOne({
       email,
-      forgotPasswordOTPExpire: { $gt: Date.now() },
+      // forgotPasswordOTPExpire: { $gt: Date.now() },
     });
     if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "user not found with this eamil",
+      });
+    }
+    if (!user.forgotPasswordOTPExpire > Date.now()) {
       return res.status(400).json({
         success: false,
         message: "OTP has been expired",

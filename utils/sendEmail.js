@@ -1,31 +1,32 @@
 const nodemailer = require("nodemailer");
+require("dotenv").config();
 
-module.exports = async (email, subject, text) => {
-  try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.HOST,
+const sendMail = async ({ companyName, email, subject, message }) => {
+  await nodemailer
+    .createTransport({
       service: process.env.SERVICE,
-      port: 587,
-      secure: true,
       auth: {
         user: process.env.USER,
-        pass: process.env.PASS,
+        pass: process.env.USER_PASSWORD,
       },
-    });
-    await transporter.sendMail({
-      from: process.env.USER,
-      to: email,
-      subject,
-      text,
-    });
-    res.status(200).json({ success: true, message: "Email send successfully" });
-  } catch (error) {
-    res
-      .status(400)
-      .json({
-        success: false,
-        message: "Email not sent",
-        error: error.message,
-      });
-  }
+    })
+    .sendMail(
+      {
+        from: `${companyName} <${process.env.USER}>`,
+        to: email,
+        subject: subject,
+        text: message,
+      },
+      (error, result) => {
+        if (error) {
+          console.log(`Failed to send OTP\n${error}`);
+        }
+        if (result) {
+          // console.log("OTP send successfully\n", result);
+          console.log("OTP send successfully");
+        }
+      }
+    );
 };
+
+module.exports = sendMail;
